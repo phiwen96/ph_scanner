@@ -1,16 +1,30 @@
 #pragma once
 #include <ph_scanner/token.hpp>
+#include <unordered_map>
 
 using namespace std;
 
 #define IS_DIGIT(x) (x >= '0' and x <= '9')
+#define IS_ALPHA(x) (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z') || x == '_'
 
+/**
+ maximal munch. When two lexical grammar rules can both match a chunk of code that the scanner is looking at, whichever one matches the most characters wins.
+ */
 
 
 struct scanner
 {
-    string m_source;
-    vector <token> m_tokens;
+    string m_source {};
+    vector <token> m_tokens {};
+    inline static unordered_map <string, token::type> m_keywords = {
+    #define X(x, y) \
+        {y, token::type::x},
+        
+        KEY_WORDS
+    #undef X
+    };
+
+    
     
     int m_start {0};
     int m_current {0};
@@ -23,9 +37,10 @@ struct scanner
         while (not is_at_end ())
         {
             m_start = m_current;
-            
-            
+            scan_token ();
         }
+        
+        return m_tokens;
     }
     
     
@@ -37,14 +52,11 @@ private:
         
         if (c == '-')
         {
-            //            value.push_back ('-');
             add_token (token::type::minus);
-            //            goto minus;
             
         } else if (c == '+')
         {
-            //            cout << "ADD" << endl;
-            add_token (token::type::star);
+            add_token (token::type::plus);
             
         } else if (c == '(')
         {
@@ -102,12 +114,21 @@ private:
         {
             add_token (token::type::tab);
             
-        } else if (IS_DIGIT (c))
-        {
-            number ();
         } else if (c == '!')
         {
             add_token (match ('=') ? token::type::bang_equal : token::type::bang);
+            
+        } else if (IS_DIGIT (c))
+        {
+            number ();
+            
+        }  else if (IS_ALPHA (c))
+        {
+            identifier ();
+            
+        } else
+        {
+            throw;
         }
     }
     auto advance () -> char
@@ -127,9 +148,13 @@ private:
     }
     void add_token (token::type type)
     {
+        add_token (type, string {m_source.begin (), m_source.begin () + m_current});
+    }
+    void add_token (token::type type, string s)
+    {
         m_tokens.push_back (token {
             type,
-            string {m_source.begin (), m_source.begin () + m_current},
+            s,
             m_line
         });
     }
@@ -142,6 +167,11 @@ private:
         if (is_at_end ()) return '\0';
         return m_source [m_current];
     }
+    auto peek_next () -> char
+    {
+        if (m_current + 1 >= m_source.size ()) return '\0';
+        return m_source [m_current + 1];
+    }
     auto number () -> void
     {
         while (IS_DIGIT (peek ()))
@@ -149,8 +179,10 @@ private:
             advance ();
         }
         
-        if (peek () == '.')
+        if (peek () == '.' and IS_DIGIT (peek_next ()))
         {
+            advance ();
+            
             while (IS_DIGIT (peek ()))
             {
                 advance ();
@@ -159,4 +191,49 @@ private:
         
         add_token (token::type::number);
     }
+    auto _string () -> void
+    {
+        while (peek () != '"' and not is_at_end ())
+        {
+            if (peek () == '\n')
+            {
+                ++ m_line;
+            }
+            
+            advance ();
+        }
+        
+        if (is_at_end ())
+        {
+            //      Lox.error(line, "Unterminated string.");
+            return;
+        }
+        
+        // the closing "
+        advance ();
+        
+        
+        string value = string {m_source.begin () + 1, m_source.begin () + (m_current - 1)};
+        add_token (token::type::string, value);
+    }
+    auto identifier () -> void
+    {
+        while (IS_ALPHA (peek ()) or IS_DIGIT (peek ()))
+        {
+            advance ();
+        }
+        
+        string text = string {m_source.begin () + m_start, m_source.begin () + m_current};
+        
+        if (auto found = m_keywords.find (text);
+                found != m_keywords.end ()) {
+            
+            add_token (found -> second);
+            
+        } else
+        {
+            add_token (token::type::identifier);
+        }
+    }
+   
 };

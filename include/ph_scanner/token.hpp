@@ -22,8 +22,20 @@ using namespace std;
 
    EOF
  */
+#define KEY_WORDS \
+X (AND, "and") \
+X (OR, "or") \
+X (TRUE, "true") \
+X (FALSE, "false") \
+X (IF, "if") \
+X (ELSE, "else") \
+X (THEN, "then") \
+
+
+
 
 #define TOKENS \
+KEY_WORDS \
 X (bang) \
 X (bang_equal) \
 X (equal_equal) \
@@ -54,7 +66,9 @@ X (factor) \
 X (term) \
 X (expression) \
 X (slash) \
-X (comment)
+X (comment) \
+X (string) \
+X (identifier)
 
 
 
@@ -65,7 +79,7 @@ struct token
 {
     enum struct type
     {
-#define X(a) \
+#define X(a, ...) \
 a,
         TOKENS
 #undef X
@@ -98,7 +112,7 @@ inline ostream& operator<< (ostream& os, token const& t)
 {
     switch (t.m_type)
     {
-#define X(x) \
+#define X(x, ...) \
 case token::type::x: \
 os << "<" << #x << ">"; \
 break;
